@@ -1,0 +1,68 @@
+function sendLatestYoutubeVideo() {
+  // Get the latest video from your YouTube channel
+  var API_KEY = 'YOUR_YOUTUBE_API_KEY';
+  var CHANNEL_ID = 'YOUTUBE_CHANNEL_ID';
+  var url = 'https://www.googleapis.com/youtube/v3/activities?part=snippet,contentDetails&channelId=' + CHANNEL_ID + '&maxResults=1&key=' + API_KEY;
+  var response = UrlFetchApp.fetch(url);
+  var data = JSON.parse(response.getContentText());
+  
+  // Check if any videos were found in the channel
+  if (data.items.length == 0) {
+    Logger.log("No videos found in channel");
+    return;
+  }
+
+  // Check if the latest activity is a video upload or scheduled video
+  var activityType = data.items[0].snippet.type;
+  if (activityType != "upload" && activityType != "scheduled") {
+    Logger.log("There is no video uploaded or scheduled");
+    return;
+  }
+  
+  var videoTitle = data.items[0].snippet.title;
+  var videoId = data.items[0].contentDetails.upload ? data.items[0].contentDetails.upload.videoId : data.items[0].contentDetails ? data.items[0].contentDetails.videoId : '';
+  
+  // Check if the videoId is available
+  if (!videoId) {
+    Logger.log("No videoId found in activity");
+    return;
+  }
+  
+  var videoUrl = 'https://www.youtube.com/watch?v=' + videoId;
+
+  // Set up the Telegram Bot API
+  var TELEGRAM_BOT_TOKEN = 'YOUR_TELEGRAM_BOT_API_TOKEN';
+  var TELEGRAM_CHAT_IDS = ['@TELEGRAM_CHAT_1', '@TELEGRAM_CHAT_1'];
+  var telegramUrl = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage';
+
+  // Create a button with a URL to the latest video
+  var buttonText = "Watch Now ▶";
+  var buttonUrl = videoUrl;
+  var button = {
+    inline_keyboard: [[{
+      text: buttonText,
+      url: buttonUrl
+    }]]
+  };
+  var keyboard = JSON.stringify(button);
+
+  // Send a message to your Telegram channels with the latest video information and the button
+  var message = '🔔' + videoTitle + '\n' + videoUrl;
+  var payload = {
+    'parse_mode': 'HTML',
+    'enable_web_page_preview': true,
+    'reply_markup': keyboard
+  };
+  
+  for (var i = 0; i < TELEGRAM_CHAT_IDS.length; i++) {
+    payload.chat_id = TELEGRAM_CHAT_IDS[i];
+    payload.text = message;
+    var response = UrlFetchApp.fetch(telegramUrl, {'method': 'post', 'payload': payload});
+    var responseData = JSON.parse(response.getContentText());
+    if (!responseData.ok) {
+      Logger.log("Error sending message to chat " + TELEGRAM_CHAT_IDS[i] + ": " + responseData.description);
+    } else {
+      Logger.log("Message sent to chat " + TELEGRAM_CHAT_IDS[i]);
+    }
+  }
+}
